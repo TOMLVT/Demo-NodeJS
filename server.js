@@ -10,7 +10,8 @@ const DB = process.env.DATABASE.replace('<PASSWORD>' , process.env.DATABASE_PASS
 
 mongoose.connect(DB, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    ssl: true,
 }).then(con => 
     console.log('DB connection successful!')
 );

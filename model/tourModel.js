@@ -25,7 +25,7 @@ const tourSchema = new mongoose.Schema({
     },
     ratingQuantity : {
         type : Number,
-        default : 0
+        default : 4.5
     },  
     price : {
         type : Number,
@@ -48,7 +48,8 @@ const tourSchema = new mongoose.Schema({
     images : [String],
     createAt : {
         type : Date,
-        default : Date.now()
+        default : Date.now(),
+        select : false
     },
     startDates : [Date]
 })

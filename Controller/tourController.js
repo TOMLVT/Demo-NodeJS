@@ -1,16 +1,17 @@
 // const fs = require('fs')
 const Tour = require('./../model/tourModel')
+const APIFeatures = require('./../utils/apiFeatures')
 
-// exports.checkID = (req,res,next,val) => {
-//     console.log(`Tour id is ${val}`)
-//     if (req.params.id * 1 > tours.length) {
-//         return res.status(404).json({
-//             status: 'Faild !',
-//             message : 'Invalied ID !'
-//         })
-//     }
-//     next()
-// }
+
+exports.aliasTopTours = (req, res, next) => {  // Đổi thứ tự tham số
+    req.query.limit = '5';
+    req.query.sort = '-ratingsAverage,price';
+    req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
+    next();
+};
+
+
+
 
 exports.checkBody = (req , res , next) => {
      if (!req.body.name || !req.body.price) {
@@ -26,27 +27,9 @@ exports.getAllTours = async (req, res) => {
     try {
         console.log(req.query);
 
-        // 1 -- Filtering 
-        const queryObj = { ...req.query };
-        const excludedFields = ['page', 'sort', 'limit', 'fields'];
-        excludedFields.forEach(el => delete queryObj[el]);
-
-        // 2 -- Advanced Filtering 
-        let queryStr = JSON.stringify(queryObj);
-        queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
-
-        let query = Tour.find(JSON.parse(queryStr));
-
-        // Sorting 
-        if (req.query.sort) {
-            const sortBy = req.query.sort.split(',').join(' ');
-            query = query.sort(sortBy);
-        } else {
-            query = query.sort('-createdAt'); 
-        }
-
         // Execute the query
-        const tours = await query;
+        const features = new APIFeatures(Tour.find(),req.query).filter().sort().limitField().paginate()
+        const tours = await features.query;
 
         // Send response 
         res.status(200).json({
@@ -130,6 +113,45 @@ exports.updateTour = async (req, res) => {
         })
     }
 }
+
+exports.getTourStats = async (req, res) => {
+    try {
+        const stats = await Tour.aggregate([
+            {
+                $match: { ratingsAverage: { $gte: 4.5 } }
+            },
+            {
+                $group: {
+                    _id: '$difficulty',
+                    numTours: { $sum: 1 },
+                    numRatings: { $sum: '$ratingQuantity' },
+                    avgRating: { $avg: '$ratingsAverage' },
+                    avgPrice: { $avg: '$price' },
+                    minPrice: { $min: '$price' },
+                    maxPrice: { $max: '$price' }
+                }
+            },
+            {
+                $sort : { avgPrice : 1 }
+            }
+        ]);
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                stats
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            status: 'Fail',
+            message: err.message
+        });
+    }
+};
+
+
 
 exports.deleteTour = async (req , res) => {
     try {
