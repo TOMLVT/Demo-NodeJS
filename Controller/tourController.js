@@ -1,7 +1,8 @@
 // const fs = require('fs')
 const Tour = require('./../model/tourModel')
 const APIFeatures = require('./../utils/apiFeatures')
-
+const CatchAsync = require('./../utils/CatchAsync')
+const AppError = require('../utils/appError');
 
 exports.aliasTopTours = (req, res, next) => {  // Đổi thứ tự tham số
     req.query.limit = '5';
@@ -23,8 +24,11 @@ exports.checkBody = (req , res , next) => {
      next()
 }
 // Get Tours -----------------------------------------------
-exports.getAllTours = async (req, res) => {
-    try {
+
+// --- use function instead using of try / catch 
+
+exports.getAllTours = CatchAsync (async (req, res) => {
+    
         console.log(req.query);
 
         // Execute the query
@@ -40,42 +44,47 @@ exports.getAllTours = async (req, res) => {
                 tours
             }
         });
-    } catch (err) {
+    
         res.status(500).json({
             status: 'Fail!',
             message: err.message || 'Error sending data!',
         });
-    }
-};
+    
+});
 
 
-exports.getTour =  async(req ,res) => {
+exports.getTour =   CatchAsync(async(req ,res) => {
 
-    try {
+  
       const tour =   await Tour.findById(req.params.id)
+
+       if(!tour) {
+          return next(new AppError('Np tour found with that ID !' , 404)) // Refactoring AppError show error 
+       }
+
        res.status(200).json({
         status: 'success !',
         data : {
             tour
         }
      })
-    } catch (err) {
-        res.status(401).json({
-            status : 'Fail !',
-            message : 'Error send Data !'
-        })
-    }
+   
+       
 
-}
+})
 
 
 
-exports.createTour = async (req , res) => {
-        try {
+exports.createTour = CatchAsync(async (req , res) => {
+       
            // const newTours = new Tour({})
             // newTours.save()
 
             const newTour = await Tour.create(req.body)
+
+            if(!tour) {
+                return next(new AppError('Np tour found with that ID !' , 404)) // Refactoring AppError show error 
+             }
 
             res.status(201).json({
                 status : 'success',
@@ -84,38 +93,39 @@ exports.createTour = async (req , res) => {
                 }
             })
   
-        } catch (err) {
-            res.status(400).json({
-                status : 'Fail !',
-                message : err
-            })
-        }
- }
+      
+          
+        
+ })
 
  // use from mongoose model : findByIdandUpdate , findId,...
 
-exports.updateTour = async (req, res) => {
-    try {
+exports.updateTour = CatchAsync(async (req, res) => {
+   
         const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
             new : true,
             runValidators : true
         })
+
+        if(!tour) {
+            return next(new AppError('Np tour found with that ID !' , 404)) // Refactoring AppError show error 
+         }
+
+
         res.status(200).json({
             status: 'success !',
             data : {
               tour
             }
         })
-    } catch (err) {
-        res.status(404).json({
-            status : 'Fail !',
-            message : err
-        })
-    }
-}
+  
+      
+    
+})
 
-exports.getTourStats = async (req, res) => {
-    try {
+// structure group complexed operator -------------------------------------------------------- 
+exports.getTourStats = CatchAsync(async (req, res) => {
+   
         const stats = await Tour.aggregate([
             {
                 $match: { ratingsAverage: { $gte: 4.5 } }
@@ -133,7 +143,8 @@ exports.getTourStats = async (req, res) => {
             },
             {
                 $sort : { avgPrice : 1 }
-            }
+            },
+           
         ]);
 
         res.status(200).json({
@@ -143,27 +154,84 @@ exports.getTourStats = async (req, res) => {
             }
         });
 
-    } catch (err) {
+   
         res.status(500).json({
             status: 'Fail',
             message: err.message
         });
-    }
-};
+    
+});
+
+// monthly tour ------------------------------------------------------------------
+exports.getMonthlyPlan = CatchAsync(async (req, res) => {
+   
+        const year = req.params.year * 1;
+        const plan = await Tour.aggregate([
+            {
+                $unwind: '$startDates'
+            },
+            {
+                $match: {
+                    startDates: {
+                        $gte: new Date(`${year}-01-01`),
+                        $lte: new Date(`${year}-12-31`)
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: { $month: '$startDates' }, // Nhóm theo tháng
+                    numTourStart: { $sum: 1 },
+                    tours: { $push: '$name' }
+                }
+            },
+            {
+                $sort: {
+                    numTourStart: -1
+                }
+            },
+            {
+                $addFields: { month: '$_id' }
+            },
+            {
+                $project: {
+                    _id: 0
+                }
+            },
+            {
+                $limit: 12
+            }
+        ]);
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                plan
+            }
+        });
+   
+        res.status(500).json({
+            status: 'fail',
+            message: err.message
+        });
+    
+});
 
 
 
-exports.deleteTour = async (req , res) => {
-    try {
+exports.deleteTour = CatchAsync(async (req , res) => {
+    
         const tour = await Tour.findByIdAndDelete(req.params.id)
+
+        if(!tour) {
+            return next(new AppError('Np tour found with that ID !' , 404)) // Refactoring AppError show error 
+         }
+
+         
         res.status(204).json({
             status : 'success !',
             data : null
         })
-    }catch (err) {
-        res.status(400).json({
-            status : 'Fail !',
-            message : 'Invalid data send !'
-        })
-    }
-}
+ 
+      
+})
